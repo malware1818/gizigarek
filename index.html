@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gizul vs Garek</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(to bottom, #1a0033, #330066, #1a0033);
+            overflow: hidden;
+            font-family: 'Arial Black', sans-serif;
+        }
+        
+        canvas {
+            display: block;
+            background: radial-gradient(circle at 50% 50%, #2a0a4a 0%, #0d0020 100%);
+        }
+        
+        .dialogue {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            border: 3px solid #00ffff;
+            border-radius: 15px;
+            padding: 20px 40px;
+            color: #fff;
+            font-size: 24px;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5), inset 0 0 20px rgba(0, 255, 255, 0.1);
+            z-index: 100;
+            opacity: 0;
+            animation: fadeIn 0.5s forwards;
+            min-width: 300px;
+            text-align: center;
+        }
+        
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        
+        .dialogue.fadeOut {
+            animation: fadeOut 0.5s forwards;
+        }
+        
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+        
+        .name {
+            font-size: 18px;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+        
+        .name.gizul {
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+        }
+        
+        .name.garek {
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        
+        .impact-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 50;
+        }
+        
+        .impact-flash.active {
+            animation: flash 0.2s;
+        }
+        
+        @keyframes flash {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 0.6; }
+        }
+        
+        .title {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 48px;
+            color: #fff;
+            text-shadow: 0 0 20px #ff00ff, 0 0 40px #00ffff;
+            letter-spacing: 5px;
+            z-index: 100;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { text-shadow: 0 0 20px #ff00ff, 0 0 40px #00ffff; }
+            50% { text-shadow: 0 0 30px #ff00ff, 0 0 60px #00ffff; }
+        }
+        
+        .health-bars {
+            position: absolute;
+            top: 100px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 50px;
+            z-index: 100;
+        }
+        
+        .health-bar {
+            width: 300px;
+        }
+        
+        .health-name {
+            font-size: 20px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-shadow: 0 0 10px currentColor;
+        }
+        
+        .health-container {
+            width: 100%;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid currentColor;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 0 20px currentColor;
+        }
+        
+        .health-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.5s;
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+        
+        .gizul-bar {
+            color: #ff00ff;
+        }
+        
+        .gizul-bar .health-fill {
+            background: linear-gradient(90deg, #ff00ff, #ff66ff);
+        }
+        
+        .garek-bar {
+            color: #00ff00;
+        }
+        
+        .garek-bar .health-fill {
+            background: linear-gradient(90deg, #00ff00, #66ff66);
+        }
+    </style>
+</head>
+<body>
+    <div class="title">GIZUL vs GAREK</div>
+    
+    <div class="health-bars">
+        <div class="health-bar gizul-bar">
+            <div class="health-name">GIZUL</div>
+            <div class="health-container">
+                <div class="health-fill" id="gizulHealth"></div>
+            </div>
+        </div>
+        <div class="health-bar garek-bar">
+            <div class="health-name">GAREK</div>
+            <div class="health-container">
+                <div class="health-fill" id="garekHealth"></div>
+            </div>
+        </div>
+    </div>
+    
+    <canvas id="canvas"></canvas>
+    <div class="impact-flash" id="flash"></div>
+    <div class="dialogue" id="dialogue" style="display: none;">
+        <div class="name" id="dialogueName"></div>
+        <div id="dialogueText"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        const particles = [];
+        let time = 0;
+        let scenePhase = 0;
+        let phaseTimer = 0;
+        
+        let gizulHealth = 100;
+        let garekHealth = 100;
+
+        class Character {
+            constructor(x, y, color, name) {
+                this.x = x;
+                this.y = y;
+                this.targetX = x;
+                this.targetY = y;
+                this.color = color;
+                this.name = name;
+                this.armAngle = 0;
+                this.legPhase = 0;
+                this.attacking = false;
+                this.attackFrame = 0;
+                this.weapon = name === 'GIZUL' ? 'sword' : 'axe';
+                this.scale = 1;
+            }
+
+            update() {
+                this.x += (this.targetX - this.x) * 0.05;
+                this.y += (this.targetY - this.y) * 0.05;
+                
+                if (this.attacking) {
+                    this.attackFrame++;
+                    if (this.attackFrame > 20) {
+                        this.attacking = false;
+                        this.attackFrame = 0;
+                    }
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.scale(this.scale, this.scale);
+
+                const pulse = Math.sin(time * 0.1) * 0.05 + 1;
+                const attackSwing = this.attacking ? Math.sin(this.attackFrame * 0.5) * 60 : 0;
+
+                function drawGlow(x, y, radius, color) {
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+                    gradient.addColorStop(0, color);
+                    gradient.addColorStop(1, 'transparent');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Aura
+                drawGlow(0, 0, 80 * pulse, this.color + '40');
+
+                // Body
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 5;
+                ctx.lineCap = 'round';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = this.color;
+
+                // Head
+                ctx.beginPath();
+                ctx.arc(0, -70, 20, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Eyes
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 10;
+                ctx.fillRect(-10, -73, 6, 6);
+                ctx.fillRect(4, -73, 6, 6);
+
+                // Body
+                ctx.beginPath();
+                ctx.moveTo(0, -50);
+                ctx.lineTo(0, 20);
+                ctx.stroke();
+
+                // Arms
+                const legSwing = Math.sin(this.legPhase) * 15;
+                
+                ctx.beginPath();
+                ctx.moveTo(0, -30);
+                ctx.lineTo(-30 + attackSwing * 0.5, 0 + attackSwing * 0.3);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, -30);
+                ctx.lineTo(30 - attackSwing * 0.5, 0 - attackSwing * 0.3);
+                ctx.stroke();
+
+                // Legs
+                ctx.beginPath();
+                ctx.moveTo(0, 20);
+                ctx.lineTo(-15 + legSwing, 60);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, 20);
+                ctx.lineTo(15 - legSwing, 60);
+                ctx.stroke();
+
+                // Weapon
+                ctx.save();
+                ctx.translate(this.name === 'GIZUL' ? 30 : -30, -10);
+                ctx.rotate((attackSwing * Math.PI / 180) * (this.name === 'GIZUL' ? 1 : -1));
+
+                if (this.weapon === 'sword') {
+                    // Sword
+                    ctx.strokeStyle = '#00ffff';
+                    ctx.lineWidth = 4;
+                    ctx.shadowColor = '#00ffff';
+                    ctx.shadowBlur = 25;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(0, -60);
+                    ctx.stroke();
+
+                    // Blade glow
+                    const swordGradient = ctx.createLinearGradient(0, 0, 0, -60);
+                    swordGradient.addColorStop(0, '#00ffff80');
+                    swordGradient.addColorStop(1, '#ffffff');
+                    ctx.strokeStyle = swordGradient;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Guard
+                    ctx.strokeStyle = '#00ffff';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(-15, 0);
+                    ctx.lineTo(15, 0);
+                    ctx.stroke();
+                } else {
+                    // Axe
+                    ctx.strokeStyle = '#ff6600';
+                    ctx.lineWidth = 5;
+                    ctx.shadowColor = '#ff6600';
+                    ctx.shadowBlur = 25;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(0, -50);
+                    ctx.stroke();
+
+                    // Axe blade
+                    ctx.fillStyle = '#ffaa00';
+                    ctx.shadowBlur = 30;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -50);
+                    ctx.lineTo(-25, -65);
+                    ctx.lineTo(-20, -50);
+                    ctx.lineTo(0, -45);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+                ctx.restore();
+
+                // Attack particles
+                if (this.attacking && this.attackFrame < 10) {
+                    for (let i = 0; i < 5; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = Math.random() * 50 + 30;
+                        particles.push({
+                            x: this.x + Math.cos(angle) * dist,
+                            y: this.y + Math.sin(angle) * dist - 30,
+                            vx: Math.cos(angle) * 2,
+                            vy: Math.sin(angle) * 2 - 1,
+                            life: 30,
+                            color: this.color,
+                            size: Math.random() * 4 + 2
+                        });
+                    }
+                }
+            }
+
+            attack() {
+                this.attacking = true;
+                this.attackFrame = 0;
+            }
+
+            moveTo(x, y) {
+                this.targetX = x;
+                this.targetY = y;
+            }
+        }
+
+        const gizul = new Character(canvas.width * 0.25, canvas.height * 0.6, '#ff00ff', 'GIZUL');
+        const garek = new Character(canvas.width * 0.75, canvas.height * 0.6, '#00ff00', 'GAREK');
+        garek.scale = -1;
+
+        const dialogues = [
+            { speaker: 'GIZUL', text: 'Garek! Wreszcie cię znalazłem!', duration: 120 },
+            { speaker: 'GAREK', text: 'Gizul... To się musiało tak skończyć.', duration: 120 },
+            { speaker: 'GIZUL', text: 'Przygotuj się na walkę!', duration: 90 },
+            { speaker: 'GAREK', text: 'Niech będzie! Do ataku!', duration: 90 }
+        ];
+
+        let currentDialogue = -1;
+        let dialogueTimer = 0;
+
+        function showDialogue(index) {
+            if (index >= dialogues.length) return;
+            
+            const dialogue = dialogues[index];
+            const dialogueEl = document.getElementById('dialogue');
+            const nameEl = document.getElementById('dialogueName');
+            const textEl = document.getElementById('dialogueText');
+            
+            nameEl.textContent = dialogue.speaker;
+            nameEl.className = 'name ' + dialogue.speaker.toLowerCase();
+            textEl.textContent = dialogue.text;
+            
+            dialogueEl.style.display = 'block';
+            dialogueEl.className = 'dialogue';
+            
+            setTimeout(() => {
+                dialogueEl.className = 'dialogue fadeOut';
+                setTimeout(() => {
+                    dialogueEl.style.display = 'none';
+                }, 500);
+            }, dialogue.duration * 16);
+        }
+
+        function updateHealthBars() {
+            document.getElementById('gizulHealth').style.width = gizulHealth + '%';
+            document.getElementById('garekHealth').style.width = garekHealth + '%';
+        }
+
+        function createImpact(x, y, color) {
+            document.getElementById('flash').classList.add('active');
+            setTimeout(() => {
+                document.getElementById('flash').classList.remove('active');
+            }, 200);
+
+            for (let i = 0; i < 20; i++) {
+                const angle = (Math.PI * 2 * i) / 20;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * 5,
+                    vy: Math.sin(angle) * 5,
+                    life: 40,
+                    color: color,
+                    size: Math.random() * 6 + 3
+                });
+            }
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(13, 0, 32, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Scene control
+            phaseTimer++;
+
+            if (scenePhase === 0 && phaseTimer === 60) {
+                showDialogue(0);
+                currentDialogue = 0;
+            } else if (scenePhase === 0 && phaseTimer === 200) {
+                showDialogue(1);
+                currentDialogue = 1;
+            } else if (scenePhase === 0 && phaseTimer === 340) {
+                showDialogue(2);
+                currentDialogue = 2;
+                gizul.moveTo(canvas.width * 0.4, canvas.height * 0.6);
+                garek.moveTo(canvas.width * 0.6, canvas.height * 0.6);
+            } else if (scenePhase === 0 && phaseTimer === 480) {
+                showDialogue(3);
+                currentDialogue = 3;
+                scenePhase = 1;
+                phaseTimer = 0;
+            }
+
+            // Battle phase
+            if (scenePhase === 1) {
+                if (phaseTimer % 120 === 0 && gizulHealth > 0 && garekHealth > 0) {
+                    gizul.attack();
+                    setTimeout(() => {
+                        garekHealth = Math.max(0, garekHealth - 15);
+                        updateHealthBars();
+                        createImpact(garek.x, garek.y - 30, '#ff00ff');
+                    }, 300);
+                }
+                
+                if (phaseTimer % 120 === 60 && gizulHealth > 0 && garekHealth > 0) {
+                    garek.attack();
+                    setTimeout(() => {
+                        gizulHealth = Math.max(0, gizulHealth - 15);
+                        updateHealthBars();
+                        createImpact(gizul.x, gizul.y - 30, '#00ff00');
+                    }, 300);
+                }
+            }
+
+            // Update and draw
+            gizul.legPhase = time * 0.1;
+            garek.legPhase = time * 0.1 + Math.PI;
+            
+            gizul.update();
+            garek.update();
+
+            // Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.1;
+                p.life--;
+                
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                
+                const alpha = p.life / 40;
+                ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            gizul.draw();
+            garek.draw();
+
+            time++;
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+  </html>
